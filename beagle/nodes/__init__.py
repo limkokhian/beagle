@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from .alert import Alert
 from .domain import URI, Domain
 from .file import File, FileOf
+from .thread import Thread
 from .ip_address import IPAddress
 from .node import Node
 from .process import Process, SysMonProc
@@ -19,5 +20,6 @@ __all__ = [
     "SysMonProc",
     "Process",
     "RegistryKey",
+    "Thread",
     "Alert",
 ]

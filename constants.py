@@ -23,6 +23,7 @@ class HTTPMethods:
 
 
 class EventTypes:
+    THREAD_LAUNCHED = "thread_launched"
     PROCESS_LAUNCHED = "process_launched"
     FILE_DELETED = "file_deleted"
     FILE_OPENED = "file_opened"
@@ -84,3 +85,8 @@ class FieldNames:
     ALERTED_ON = "alerted_on"
     ALERT_NAME = "alert_name"
     ALERT_DATA = "alert_data"
+
+    # Thread Process
+    THREAD_ID = "thread_id"
+    CATEGORY = "category"
+    API_CALL = "calls"

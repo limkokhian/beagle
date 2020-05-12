@@ -2,7 +2,7 @@ from typing import Optional, Tuple, Union
 
 from beagle.common.logging import logger
 from beagle.constants import EventTypes, FieldNames
-from beagle.nodes import URI, Alert, Domain, File, IPAddress, Node, Process, RegistryKey
+from beagle.nodes import URI, Alert, Domain, File, IPAddress, Node, Process, RegistryKey, ThreadProcess, Api
 from beagle.transformers.base_transformer import Transformer
 
 # TODO: Add Timestamps to everything, if possible.
@@ -28,6 +28,8 @@ class GenericTransformer(Transformer):
 
         if event_type == EventTypes.PROCESS_LAUNCHED:
             return self.make_process(event)
+        elif event_type == EventTypes.THREAD_LAUNCHED:
+            return self.make_thread(event)
         elif event_type in [
             EventTypes.FILE_DELETED,
             EventTypes.FILE_OPENED,
@@ -69,6 +71,9 @@ class GenericTransformer(Transformer):
                 alert.alerted_on[node]
 
         return (alert,) + nodes
+
+    def make_thread(self, event: dict) -> Tuple[Thread, Api, Thread, Api]:
+        return
 
     def make_process(self, event: dict) -> Tuple[Process, File, Process, File]:
         """Accepts a process with the `EventTypes.PROCESS_LAUNCHED` event_type.
