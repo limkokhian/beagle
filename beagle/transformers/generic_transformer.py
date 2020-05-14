@@ -2,7 +2,7 @@ from typing import Optional, Tuple, Union
 
 from beagle.common.logging import logger
 from beagle.constants import EventTypes, FieldNames
-from beagle.nodes import URI, Alert, Domain, File, IPAddress, Node, Process, RegistryKey, ThreadProcess, Api
+from beagle.nodes import URI, Alert, Domain, File, IPAddress, Node, Process, RegistryKey, ThreadProcess, ApiCall
 from beagle.transformers.base_transformer import Transformer
 
 # TODO: Add Timestamps to everything, if possible.
@@ -72,8 +72,62 @@ class GenericTransformer(Transformer):
 
         return (alert,) + nodes
 
-    def make_thread(self, event: dict) -> Tuple[Thread, Api, Thread, Api]:
-        return
+    def make_thread(self, event: dict) -> Tuple[ThreadProcess, ApiCall, ThreadProcess, ApiCall]:
+        """Accepts a process with the `EventTypes.PROCESS_LAUNCHED` event_type.
+
+        For example::
+
+            {
+                FieldNames.PARENT_PROCESS_IMAGE: "cmd.exe",
+                FieldNames.PARENT_PROCESS_IMAGE_PATH: "\\",
+                FieldNames.PARENT_PROCESS_ID: "2568",
+                FieldNames.PARENT_COMMAND_LINE: '/K name.exe"',
+                FieldNames.PROCESS_IMAGE: "find.exe",
+                FieldNames.PROCESS_IMAGE_PATH: "\\",
+                FieldNames.COMMAND_LINE: 'find /i "svhost.exe"',
+                FieldNames.PROCESS_ID: "3144",
+                FieldNames.EVENT_TYPE: EventTypes.PROCESS_LAUNCHED,
+            }
+
+        Parameters
+        ----------
+        event : dict
+            [description]
+
+        Returns
+        -------
+        Tuple[Process, File, Process, File]
+            [description]
+        """
+
+        parent = ThreadProcess(
+            process_image=event[FieldNames.PARENT_PROCESS_IMAGE],
+            process_image_path=event[FieldNames.PARENT_PROCESS_IMAGE_PATH],
+            process_id=int(event[FieldNames.PARENT_PROCESS_ID]),
+            command_line=event[FieldNames.PARENT_COMMAND_LINE],
+        )
+
+        # Create the file node.
+        # TODO: Integrate into the ThreadProcess() init function?
+        parent_file = parent.get_file_node()
+        parent_file.file_of[parent]
+
+        child = ThreadProcess(
+            process_image=event[FieldNames.PROCESS_IMAGE],
+            process_image_path=event[FieldNames.PROCESS_IMAGE_PATH],
+            process_id=int(event[FieldNames.PROCESS_ID]),
+            command_line=event[FieldNames.COMMAND_LINE],
+        )
+
+        child_file = child.get_file_node()
+        child_file.file_of[child]
+
+        if FieldNames.TIMESTAMP in event:
+            parent.launched[child].append(timestamp=int(event[FieldNames.TIMESTAMP]))
+        else:
+            parent.launched[child]
+
+        return (parent, parent_file, child, child_file)
 
     def make_process(self, event: dict) -> Tuple[Process, File, Process, File]:
         """Accepts a process with the `EventTypes.PROCESS_LAUNCHED` event_type.

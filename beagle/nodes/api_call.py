@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, DefaultDict, Dict, List, Optional
 
 from beagle.nodes.node import Node
-from beagle.edges import Call
+from beagle.edges import FileOf, CopiedTo
 
 # mypy type hinting
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class ApiCall(Node):
     timestamp: Optional[int]
     hashes: Optional[Dict[str, str]] = {}
 
-    file_of: DefaultDict["Thread", FileOf]
+    file_of: DefaultDict["Process", FileOf]
     copied_to: DefaultDict["File", CopiedTo]
 
     key_fields: List[str] = ["host", "full_path"]

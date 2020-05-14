@@ -38,6 +38,7 @@ def create_app(*args):
 
     CORS(app)
     app.config["SQLALCHEMY_DATABASE_URI"] = Config.get("storage", "database")
+    # app.config["SQLALCHEMY_DATABASE_URI"] = Config.get("storage", "dir")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
