@@ -151,6 +151,45 @@ class DataSource(object, metaclass=ABCMeta):
 
         return output
 
+    def _convert_thread_to_parent_fields(self, threads: dict) -> dict:
+        """Converts a process to represent a child process.
+
+        Parameters
+        ----------
+        process : dict
+            Expects an input of format::
+
+                {
+                    FieldNames.THREAD_ID: ...,
+                    FieldNames.PROCESS_ID: ...,
+                    FieldNames.CATEGORY: ...,
+                    FieldNames.API_CALL: ...,
+                }
+
+        Returns
+        -------
+        dict
+            The same values, repesented as parent fields::
+
+                {
+                    FieldNames.PARENT_PROCESS_IMAGE
+                    FieldNames.PARENT_PROCESS_ID
+                    FieldNames.PARENT_COMMAND_LINE
+                    FieldNames.PARENT_PROCESS_IMAGE_PATH
+                }
+        """
+
+        output = {}
+        for left, right in [
+            (FieldNames.THREAD_ID, FieldNames.THREAD_ID),
+            (FieldNames.PROCESS_ID, FieldNames.PROCESS_ID),
+            (FieldNames.CATEGORY, FieldNames.CATEGORY),
+            (FieldNames.API_CALL, FieldNames.API_CALL),
+        ]:
+            output[right] = threads[left]
+
+        return output
+
 
 class ExternalDataSource(DataSource, metaclass=ABCMeta):
     """This class should be used when fetching data from exteranl sources before processing.

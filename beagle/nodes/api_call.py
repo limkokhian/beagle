@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, DefaultDict, Dict, List, Optional
 
 from beagle.nodes.node import Node
-from beagle.edges import FileOf, CopiedTo
+from beagle.edges import Call
 
 # mypy type hinting
 if TYPE_CHECKING:
@@ -13,56 +13,48 @@ class ApiCall(Node):
     __name__ = "API Call"
     __color__ = "#3CB371"
 
-    host: Optional[str]
-    full_path: Optional[str]
-    file_path: Optional[str]
-    file_name: Optional[str]
-    extension: Optional[str]
-    timestamp: Optional[int]
+    thread_id: Optional[str]
+    category: Optional[str]
+    api: Optional[int]
     hashes: Optional[Dict[str, str]] = {}
 
-    file_of: DefaultDict["Process", FileOf]
-    copied_to: DefaultDict["File", CopiedTo]
+    call: DefaultDict["ThreadProcess", Call]
 
-    key_fields: List[str] = ["host", "full_path"]
+    key_fields: List[str] = ["thread_id", "category", "api"]
 
     def __init__(
         self,
-        host: str = None,
-        file_path: str = None,
-        file_name: str = None,
-        full_path: str = None,
-        extension: str = None,
-        hashes: Optional[Dict[str, str]] = {},
+        thread_id: str = None,
+        category: str = None,
+        api: str = None,
     ) -> None:
-        self.host = host
-        self.file_path = file_path
-        self.file_name = file_name
+        self.thread_id = thread_id
+        self.category = category
+        self.api = file_name
 
-        if full_path:
-            self.full_path = full_path
-        elif file_path and file_name:
-            if file_path[-1] == "\\":
-                self.full_path = f"{file_path}{file_name}"
-            else:
-                self.full_path = f"{file_path}\\{file_name}"
-        else:
-            # Fixes bug where we don't know the path of a process
-            self.full_path = ""
+        # if full_path:
+        #     self.full_path = full_path
+        # elif category and file_name:
+        #     if category[-1] == "\\":
+        #         self.full_path = f"{category}{file_name}"
+        #     else:
+        #         self.full_path = f"{category}\\{file_name}"
+        # else:
+        #     # Fixes bug where we don't know the path of a process
+        #     self.full_path = ""
 
-        self.extension = extension
-        self.hashes = hashes
+        # self.extension = extension
+        # self.hashes = hashes
 
-        self.file_of = defaultdict(FileOf)
-        self.copied_to = defaultdict(CopiedTo)
+        self.call = defaultdict(Call)
 
-    def set_extension(self) -> None:
-        if self.full_path:
-            self.extension = self.full_path.split(".")[-1]
+    # def set_extension(self) -> None:
+    #     if self.full_path:
+    #         self.extension = self.full_path.split(".")[-1]
 
     @property
     def edges(self) -> List[DefaultDict]:
-        return [self.file_of, self.copied_to]
+        return [self.call]
 
     @property
     def _display(self) -> str:

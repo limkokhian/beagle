@@ -69,9 +69,11 @@ class CuckooReport(DataSource):
         self.behavior = self.report["behavior"]
 
         self.processes: Dict[int, dict] = {}
+        self.threads: Dict[int, dict] = {}
         logger.info("Set up Cuckoo Sandbox")
 
     def metadata(self) -> dict:
+
         return {
             "machine": self.report["info"]["machine"]["name"],
             "package": self.report["info"]["package"],
@@ -91,7 +93,6 @@ class CuckooReport(DataSource):
 
         # First, do process launching.
         yield from self.process_tree()
-        yield from self.identify_apicalls()
 
         # for each process, iterate over it's summary
         for process_summary in self.behavior["generic"]:
@@ -134,8 +135,8 @@ class CuckooReport(DataSource):
             }
 
         return processes
-    
-    def identify_apicalls(self) -> Dict[int, dict]:
+
+    def identify_threads(self) -> Dict[int, dict]:
         """The `generic` tab contains an array of processes. We can iterate over it to quickly generate
         `Process` entries for later. After grabbing all processes, we can walk the "processtree" entry
         to update them with the command lines.
@@ -146,19 +147,104 @@ class CuckooReport(DataSource):
         None
         """
 
-        processes = {}
+        threads = {}
 
-        for process in self.behavior["generic"]:
+        for process in self.behavior["processes"]:
 
-            proc_name, proc_path = split_path(process["process_path"])
-
-            processes[int(process["pid"])] = {
-                FieldNames.PROCESS_IMAGE: proc_name,
-                FieldNames.PROCESS_IMAGE_PATH: proc_path,
+            threads[int(process["tid"])] = {
+                FieldNames.THREAD_ID: int(process["tid"]),
                 FieldNames.PROCESS_ID: int(process["pid"]),
+                FieldNames.CATEGORY: "unknown",
+                FieldNames.API_CALL: "unknown",
             }
 
-        return processes
+        return threads
+    
+    def process_calls(self) -> Generator[dict, None, None]:
+        def process_single_calls(entry: dict) -> Generator[dict, None, None]:
+
+            current_proc = self.threads[int(entry["tid"])] 
+            # if int(entry["tid"]) in self.threads else {
+            #         FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+            #         FieldNames.THREAD_ID: entry["tid"],
+            #         FieldNames.CATEGORY: entry["category"] if "category" in entry else "",
+            #         FieldNames.API_CALL: entry["api"] if "api" in entry else ""
+            #     }
+            self.threads[int(entry["tid"])] = current_proc.copy()
+
+            children = entry.get("calls", [])
+
+            # # If the parent pid is not in the processes, then we need to make an artifical node.
+            if entry["tid"] not in self.threads and self.threads[int(entry["tid"])] == {}:
+                print({
+                    FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+                    FieldNames.THREAD_ID: entry["tid"],
+                    child_proc[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
+                    child_proc[FieldNames.API_CALL]: child["api"] if "api" in child else "",
+                    **current_proc,
+                })
+                yield {
+                    FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+                    FieldNames.THREAD_ID: entry["tid"],
+                    child_proc[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
+                    child_proc[FieldNames.API_CALL]: child["api"] if "api" in child else "",
+                    **current_proc,
+                }
+
+            if len(children) > 0:
+
+                for child in children:
+
+                    child_proc = self.threads[int(entry["tid"])]
+                    child_proc[FieldNames.CATEGORY]= child["category"],
+                    child_proc[FieldNames.API_CALL]= child["api"],
+                    self.threads[int(entry["tid"])] = child_proc.copy()
+
+                    current_as_parent = self._convert_thread_to_parent_fields(current_proc.copy())
+
+                    # print({
+                    #     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+                    #     FieldNames.TIMESTAMP: child["time"],
+                    #     **current_as_parent,
+                    #     **child_proc,
+                    # })
+
+                    yield {
+                        FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+                        FieldNames.TIMESTAMP: child["time"] if "time" in child else "unknown",
+                        **current_as_parent,
+                        **child_proc,
+                    }
+
+                    yield from process_single_calls(child)
+
+        for entry in self.behavior.get("processes", []):
+            yield from process_single_calls(entry)
+
+    # def identify_apicalls(self) -> Dict[int, dict]:
+    #     """The `generic` tab contains an array of processes. We can iterate over it to quickly generate
+    #     `Process` entries for later. After grabbing all processes, we can walk the "processtree" entry
+    #     to update them with the command lines.
+
+
+    #     Returns
+    #     -------
+    #     None
+    #     """
+
+    #     processes = {}
+
+    #     for process in self.behavior["processes"]:
+
+    #         # proc_name, proc_path = split_path(process["process_path"])
+
+    #         processes[int(process["pid"])] = {
+    #             FieldNames.CATEGORY: process["category"],
+    #             FieldNames.THREAD_ID: int(process["tid"]),
+    #             FieldNames.PROCESS_ID: int(process["pid"]),
+    #         }
+
+    #     return processes
 
     # #Added API Calls by Ali Suwanda
     # def identify_apicalls(self) -> Dict[str, dict]:
@@ -335,10 +421,15 @@ class CuckooReport(DataSource):
                 }
 
     def global_network_events(self) -> Generator[dict, None, None]:
+        self.threads: Dict[int, dict] = self.identify_threads()
+        yield from self.process_calls()
+        print(self.threads)
 
         root_proc_name = self.report.get("target", {}).get("file", {"name": ""})["name"]
+        pid = [procmemory["pid"] for procmemory in self.report["procmemory"]]
         root_proc = None
         if root_proc_name:
+            process_call = list(self.threads.value())
             process_entries = list(self.processes.values())
 
             # Get the submitted sample to match to the network events.
@@ -346,6 +437,15 @@ class CuckooReport(DataSource):
                 if proc[FieldNames.PROCESS_IMAGE] == root_proc_name:
                     root_proc = proc
                     break
+            
+            for call in process_call:
+                if call["pid"] in pid:
+                    yield {
+                        FieldNames.THREAD_ID: call[FieldNames.THREAD_ID],
+                        FieldNames.PROCESS_ID: call[FieldNames.PROCESS_ID],
+                        FieldNames.CATEGORY: call[FieldNames.CATEGORY],
+                        FieldNames.API_CALL: call[FieldNames.API_CALL]
+                    }
 
         if not root_proc_name or not root_proc:
             root_proc = list(self.processes.values())[0]
@@ -400,6 +500,7 @@ class CuckooReport(DataSource):
             # If answers, this will make the resolved to edge from the generic transformer.
             if "answers" in dns_request and dns_request["answers"]:
                 for answer in dns_request["answers"]:
+
                     yield {
                         FieldNames.HTTP_HOST: dns_request["request"],
                         FieldNames.EVENT_TYPE: EventTypes.DNS_LOOKUP,
@@ -408,6 +509,7 @@ class CuckooReport(DataSource):
                     }
             else:
                 # Otherwise, only add the DNS request
+
                 yield {
                     FieldNames.HTTP_HOST: dns_request["request"],
                     FieldNames.EVENT_TYPE: EventTypes.DNS_LOOKUP,
@@ -415,6 +517,7 @@ class CuckooReport(DataSource):
                 }
 
         for http_request in network_connections.get("http_ex", []):
+
             yield {
                 FieldNames.EVENT_TYPE: EventTypes.HTTP_REQUEST,
                 FieldNames.HTTP_METHOD: http_request["method"],

@@ -89,4 +89,5 @@ class FieldNames:
     # Thread Process
     THREAD_ID = "thread_id"
     CATEGORY = "category"
-    API_CALL = "calls"
+    API_CALL = "api_call"
+    CALLS = "calls"
