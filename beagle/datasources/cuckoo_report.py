@@ -69,6 +69,7 @@ class CuckooReport(DataSource):
         self.behavior = self.report["behavior"]
 
         self.processes: Dict[int, dict] = {}
+        self.proc_calls: self.report["processes"]
         self.threads: Dict[int, dict] = {}
         logger.info("Set up Cuckoo Sandbox")
 
@@ -87,9 +88,6 @@ class CuckooReport(DataSource):
     def events(self) -> Generator[dict, None, None]:
 
         self.processes: Dict[int, dict] = self.identify_processes()
-
-        #Added new lines by Ali - Call apicall function
-        # self.apicalls: Dict[str, dict] = self.identify_apicalls()
 
         # First, do process launching.
         yield from self.process_tree()
@@ -136,6 +134,49 @@ class CuckooReport(DataSource):
 
         return processes
 
+    def process_tree(self) -> Generator[dict, None, None]:
+        def process_single_entry(entry: dict) -> Generator[dict, None, None]:
+
+            current_proc = self.processes[int(entry["pid"])]
+            current_proc[FieldNames.COMMAND_LINE] = entry["command_line"]
+            self.processes[int(entry["pid"])] = current_proc.copy()
+
+            children = entry.get("children", [])
+
+            # If the parent pid is not in the processes, then we need to make an artifical node.
+            if entry["ppid"] not in self.processes:
+                
+                yield {
+                    FieldNames.EVENT_TYPE: EventTypes.PROCESS_LAUNCHED,
+                    FieldNames.TIMESTAMP: entry["first_seen"],
+                    FieldNames.PARENT_PROCESS_ID: entry["ppid"],
+                    FieldNames.PARENT_PROCESS_IMAGE: "Unknown",
+                    FieldNames.PARENT_PROCESS_IMAGE_PATH: "\\",
+                    FieldNames.PARENT_COMMAND_LINE: "",
+                    **current_proc,
+                }
+
+            if len(children) > 0:
+
+                for child in children:
+
+                    child_proc = self.processes[int(child["pid"])]
+                    child_proc[FieldNames.COMMAND_LINE] = child["command_line"]
+                    self.processes[int(child["pid"])] = child_proc.copy()
+
+                    current_as_parent = self._convert_to_parent_fields(current_proc.copy())
+                    yield {
+                        FieldNames.EVENT_TYPE: EventTypes.PROCESS_LAUNCHED,
+                        FieldNames.TIMESTAMP: child["first_seen"],
+                        **current_as_parent,
+                        **child_proc,
+                    }
+
+                    yield from process_single_entry(child)
+
+        for entry in self.behavior.get("processtree", []):
+            yield from process_single_entry(entry)
+
     def identify_threads(self) -> Dict[int, dict]:
         """The `generic` tab contains an array of processes. We can iterate over it to quickly generate
         `Process` entries for later. After grabbing all processes, we can walk the "processtree" entry
@@ -149,39 +190,49 @@ class CuckooReport(DataSource):
 
         threads = {}
 
-        for process in self.behavior["processes"]:
+        # for process in self.behavior["processes"]:
+        #     threads[int(process["tid"])] = {
+        #         FieldNames.THREAD_ID: int(process["tid"]),
+        #         #FieldNames.PROCESS_ID: int(process["pid"]),
+        #         #FieldNames.CATEGORY: "unknown",
+        #         #FieldNames.API_CALL: "unknown",
+        #     }
 
+        for process in self.proc_calls["calls"]:
             threads[int(process["tid"])] = {
                 FieldNames.THREAD_ID: int(process["tid"]),
-                FieldNames.PROCESS_ID: int(process["pid"]),
-                FieldNames.CATEGORY: "unknown",
-                FieldNames.API_CALL: "unknown",
+                #FieldNames.PROCESS_ID: int(process["pid"]),
+                #FieldNames.CATEGORY: "unknown",
+                #FieldNames.API_CALL: "unknown",
             }
-
         return threads
-    
+
     def process_calls(self) -> Generator[dict, None, None]:
         def process_single_calls(entry: dict) -> Generator[dict, None, None]:
 
-            current_threads = self.threads[int(entry["tid"])] if int(entry["tid"]) in self.threads else {
-                    FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
-                    FieldNames.THREAD_ID: entry["tid"],
-                    FieldNames.CATEGORY: entry["category"] if "category" in entry else "",
-                    FieldNames.API_CALL: entry["api"] if "api" in entry else ""
-                }
+            print(self.threads)
+
+            current_threads = self.threads[int(entry["tid"])] 
+            #if int(entry["tid"]) in self.threads {
+            #         FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+            #         FieldNames.THREAD_ID: entry["tid"],
+            #         FieldNames.CATEGORY: entry["category"] if "category" in entry else "",
+            #         FieldNames.API_CALL: entry["api"] if "api" in entry else ""
+            #}
             self.threads[int(entry["tid"])] = current_threads.copy()
 
             children = entry.get("calls", [])
 
+            #print(children)
             # # If the parent pid is not in the processes, then we need to make an artifical node.
-            if entry["tid"] not in self.threads and self.threads[int(entry["tid"])] == {}:
-                print({
-                    FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
-                    FieldNames.THREAD_ID: entry["tid"],
-                    current_threads[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
-                    current_threads[FieldNames.API_CALL]: child["api"] if "api" in child else "",
-                    **current_threads,
-                })
+            if entry["tid"] not in self.threads: #and self.threads[int(entry["tid"])] == {}:
+                # print({
+                #     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
+                #     FieldNames.THREAD_ID: entry["tid"],
+                #     child_proc[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
+                #     child_proc[FieldNames.API_CALL]: child["api"] if "api" in child else "",
+                #     **current_threads,
+                # })
                 yield {
                     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
                     FieldNames.THREAD_ID: entry["tid"],
@@ -219,111 +270,6 @@ class CuckooReport(DataSource):
 
         for entry in self.behavior.get("processes", []):
             yield from process_single_calls(entry)
-
-    # def identify_apicalls(self) -> Dict[int, dict]:
-    #     """The `generic` tab contains an array of processes. We can iterate over it to quickly generate
-    #     `Process` entries for later. After grabbing all processes, we can walk the "processtree" entry
-    #     to update them with the command lines.
-
-
-    #     Returns
-    #     -------
-    #     None
-    #     """
-
-    #     processes = {}
-
-    #     for process in self.behavior["processes"]:
-
-    #         # proc_name, proc_path = split_path(process["process_path"])
-
-    #         processes[int(process["pid"])] = {
-    #             FieldNames.CATEGORY: process["category"],
-    #             FieldNames.THREAD_ID: int(process["tid"]),
-    #             FieldNames.PROCESS_ID: int(process["pid"]),
-    #         }
-
-    #     return processes
-
-    # #Added API Calls by Ali Suwanda
-    # def identify_apicalls(self) -> Dict[str, dict]:
-    #     def process_api_calls(entry: dict) -> Generator[dict, None, None]:
-
-    #         current_proc = self.processes[int(entry["tid"])]
-    #         self.processes[int(entry["tid"])] = current_proc.copy()
-
-    #         calls = entry.get("calls", [])
-
-    #         # If the parent pid is not in the processes, then we need to make an artifical node.
-    #         if entry["tid"] not in self.processes:
-    #             yield {
-    #                 FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
-    #                 FieldNames.THREAD_ID: entry["tid"],
-    #                 **current_proc,
-    #             }
-            
-    #         if len(calls) > 0:
-    #             for call in calls:
-    #                 call_proc = self.processes[int(call["tid"])]
-    #                 call_proc[FieldNames.CATEGORY] = call["category"]
-    #                 call_proc[FieldNames.API_CALL] = call["api"]
-    #                 self.processes[int(call["tid"])] = call_proc.copy()
-
-    #                 current_as_parent = self._convert_to_parent_fields(current_proc.copy())
-
-    #                 yield {
-    #                     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
-    #                     FieldNames.TIMESTAMP: call["time"],
-    #                     **current_as_parent,
-    #                     **call_proc,
-    #                 }
-
-    #     logger.info("API Call Function - Test")
-    #     for apicall in self.behavior["processes"]:
-    #         yield from process_single_entry(apicall)
-
-    def process_tree(self) -> Generator[dict, None, None]:
-        def process_single_entry(entry: dict) -> Generator[dict, None, None]:
-
-            current_proc = self.processes[int(entry["pid"])]
-            current_proc[FieldNames.COMMAND_LINE] = entry["command_line"]
-            self.processes[int(entry["pid"])] = current_proc.copy()
-
-            children = entry.get("children", [])
-
-            # If the parent pid is not in the processes, then we need to make an artifical node.
-            if entry["ppid"] not in self.processes:
-                yield {
-                    FieldNames.EVENT_TYPE: EventTypes.PROCESS_LAUNCHED,
-                    FieldNames.TIMESTAMP: entry["first_seen"],
-                    FieldNames.PARENT_PROCESS_ID: entry["ppid"],
-                    FieldNames.PARENT_PROCESS_IMAGE: "Unknown",
-                    FieldNames.PARENT_PROCESS_IMAGE_PATH: "\\",
-                    FieldNames.PARENT_COMMAND_LINE: "",
-                    **current_proc,
-                }
-
-            if len(children) > 0:
-
-                for child in children:
-
-                    child_proc = self.processes[int(child["pid"])]
-                    child_proc[FieldNames.COMMAND_LINE] = child["command_line"]
-                    self.processes[int(child["pid"])] = child_proc.copy()
-
-                    current_as_parent = self._convert_to_parent_fields(current_proc.copy())
-
-                    yield {
-                        FieldNames.EVENT_TYPE: EventTypes.PROCESS_LAUNCHED,
-                        FieldNames.TIMESTAMP: child["first_seen"],
-                        **current_as_parent,
-                        **child_proc,
-                    }
-
-                    yield from process_single_entry(child)
-
-        for entry in self.behavior.get("processtree", []):
-            yield from process_single_entry(entry)
 
     def _basic_file_events(
         self, process_summary: dict, process: dict

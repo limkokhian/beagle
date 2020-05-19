@@ -180,7 +180,7 @@ export default class Upload extends React.Component<UploadProps, UploadState> {
             });
             return;
         }
-
+        
         const formData = new FormData();
         formData.append("datasource", this.state.selectedDatasource.id);
         formData.append("backend", this.state.selectedBackend.id);
