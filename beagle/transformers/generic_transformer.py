@@ -104,33 +104,31 @@ class GenericTransformer(Transformer):
         """
 
         parent = ThreadProcess(
-            process_image=event[FieldNames.PARENT_PROCESS_IMAGE],
-            process_image_path=event[FieldNames.PARENT_PROCESS_IMAGE_PATH],
-            process_id=int(event[FieldNames.PARENT_PROCESS_ID]),
-            command_line=event[FieldNames.PARENT_COMMAND_LINE],
+            API_CALL=event[FieldNames.API_CALL],
+            CATEGORY=event[FieldNames.CATEGORY],
+            THREAD_ID=int(event[FieldNames.THREAD_ID])
         )
 
         # Create the file node.
         # TODO: Integrate into the ThreadProcess() init function?
-        parent_file = parent.get_file_node()
-        parent_file.file_of[parent]
+        parent_thread = parent.get_file_node()
+        parent_thread.file_of[parent]
 
         child = ThreadProcess(
-            process_image=event[FieldNames.PROCESS_IMAGE],
-            process_image_path=event[FieldNames.PROCESS_IMAGE_PATH],
-            process_id=int(event[FieldNames.PROCESS_ID]),
-            command_line=event[FieldNames.COMMAND_LINE],
+            API_CALL=event[FieldNames.API_CALL],
+            CATEGORY=event[FieldNames.CATEGORY],
+            THREAD_ID=int(event[FieldNames.THREAD_ID])
         )
 
-        child_file = child.get_file_node()
-        child_file.file_of[child]
+        child_thread = child.get_file_node()
+        child_thread.file_of[child]
 
         if FieldNames.TIMESTAMP in event:
             parent.launched[child].append(timestamp=int(event[FieldNames.TIMESTAMP]))
         else:
             parent.launched[child]
 
-        return (parent, parent_file, child, child_file)
+        return (parent, parent_thread, child, child_thread)
 
     def make_process(self, event: dict) -> Tuple[Process, File, Process, File]:
         """Accepts a process with the `EventTypes.PROCESS_LAUNCHED` event_type.

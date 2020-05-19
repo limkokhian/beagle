@@ -239,13 +239,13 @@ class CuckooReport(DataSource):
                 #     FieldNames.THREAD_ID: entry["tid"],
                 #     child_proc[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
                 #     child_proc[FieldNames.API_CALL]: child["api"] if "api" in child else "",
-                #     **current_proc,
+                #     **current_threads,
                 # })
                 yield {
                     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
                     FieldNames.THREAD_ID: entry["tid"],
-                    child_proc[FieldNames.CATEGORY]: child["category"], #if "category" in child else "", comment by Ali Suwanda 19052020
-                    child_proc[FieldNames.API_CALL]: child["api"], #if "api" in child else "", comment by Ali Suwanda 19052020
+                    current_thread[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
+                    current_thread[FieldNames.API_CALL]: child["api"] if "api" in child else "",
                     **current_thread,
                 }
 
@@ -253,12 +253,12 @@ class CuckooReport(DataSource):
 
                 for child in children:
 
-                    child_thread = self.threads[int(entry["tid"])]
-                    #child_thread[FieldNames.CATEGORY]= child["category"],
-                    #child_thread[FieldNames.API_CALL]= child["api"],
-                    self.threads[int(entry["tid"])] = child_thread.copy()
+                    current_thread = self.threads[int(entry["tid"])]
+                    current_thread[FieldNames.CATEGORY]= child["category"],
+                    current_thread[FieldNames.API_CALL]= child["api"],
+                    self.threads[int(entry["tid"])] = current_thread.copy()
 
-                    current_as_parent = self._convert_thread_to_parent_fields(current_thread.copy())
+                    current_thread_as_parent = self._convert_thread_to_parent_fields(current_thread.copy())
 
                     # print({
                     #     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
@@ -270,8 +270,8 @@ class CuckooReport(DataSource):
                     yield {
                         FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
                         FieldNames.TIMESTAMP: child["time"] if "time" in child else "unknown",
-                        **current_as_parent,
-                        **child_thread
+                        **current_thread_as_parent,
+                        **current_thread,
                     }
 
                     yield from process_single_calls(child)
