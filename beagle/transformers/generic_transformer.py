@@ -23,6 +23,9 @@ class GenericTransformer(Transformer):
 
         event_type = event.get(FieldNames.EVENT_TYPE)
 
+        print(event_type)
+        print(event)
+
         if event.get(FieldNames.ALERTED_ON):
             return self.make_alert(event)
 

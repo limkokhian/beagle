@@ -13,9 +13,9 @@ class ApiCall(Node):
     __name__ = "API Call"
     __color__ = "#3CB371"
 
-    thread_id: Optional[str]
+    thread_id: Optional[int]
     category: Optional[str]
-    api: Optional[int]
+    api: Optional[str]
     hashes: Optional[Dict[str, str]] = {}
 
     call: DefaultDict["ThreadProcess", Call]

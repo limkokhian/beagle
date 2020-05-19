@@ -78,6 +78,8 @@ class Transformer(object, metaclass=ABCMeta):
 
         threads: List[Thread] = []
 
+        print(threads)
+
         producer_thread = Thread(target=self._producer_thread)
         producer_thread.start()
         threads.append(producer_thread)
@@ -127,6 +129,7 @@ class Transformer(object, metaclass=ABCMeta):
 
     def _consumer_thread(self) -> None:
         processed = 0
+        
         while True:
             event = self._queue.get()
             processed += 1

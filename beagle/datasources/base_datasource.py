@@ -182,13 +182,16 @@ class DataSource(object, metaclass=ABCMeta):
         output = {}
         for left, right in [
             (FieldNames.THREAD_ID, FieldNames.THREAD_ID),
-            (FieldNames.PROCESS_ID, FieldNames.PROCESS_ID),
-            (FieldNames.CATEGORY, FieldNames.CATEGORY),
-            (FieldNames.API_CALL, FieldNames.API_CALL),
+            #Comment by Ali Suwanda 19052020
+            #(FieldNames.PROCESS_ID, FieldNames.PROCESS_ID),
+            #(FieldNames.CATEGORY, FieldNames.CATEGORY),
+            #(FieldNames.API_CALL, FieldNames.API_CALL),
         ]:
             output[right] = threads[left]
 
         return output
+
+        print(output[right])
 
 
 class ExternalDataSource(DataSource, metaclass=ABCMeta):
