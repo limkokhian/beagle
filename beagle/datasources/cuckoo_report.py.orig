@@ -194,22 +194,22 @@ class CuckooReport(DataSource):
         threads = {}
 
         #Added by Ali Suwanda 19052020
-        # for process2 in self.processes2:
-        #     for call in process2["calls"]:
-        #         threads[int(call["tid"])] = {
-        #              FieldNames.THREAD_ID: int(call["tid"]),
-        #              #FieldNames.CATEGORY: call["category"],
-        #              #FieldNames.API_CALL.append("unknown"),
-        #         }
+        for process2 in self.processes2:
+            for call in process2["calls"]:
+                threads[int(call["tid"])] = {
+                     FieldNames.THREAD_ID: int(call["tid"]),
+                     #FieldNames.CATEGORY: call["category"],
+                     #FieldNames.API_CALL.append("unknown"),
+                }
 
         #Commented by Ali Suwanda 19052020
-        for process in self.behavior["processes"]:
-           for call in process["calls"]:
-                threads[int(call["tid"])] = {
-                    FieldNames.THREAD_ID: int(process["tid"]),
-                    FieldNames.CATEGORY: "unknown",
-                    # FieldNames.API_CALL.append("unknown"),
-                }
+        # for process in self.behavior["processes"]:
+        #    for call in self.processes["calls"]:
+        #         threads[int(call["tid"])] = {
+        #             FieldNames.THREAD_ID: int(process["tid"]),
+        #             FieldNames.CATEGORY: "unknown",
+        #             # FieldNames.API_CALL.append("unknown"),
+        #         }
 
         
         return threads

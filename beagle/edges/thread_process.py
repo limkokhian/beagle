@@ -2,8 +2,8 @@
 from beagle.edges import Edge
 
 
-class Launched(Edge):
-    __name__ = "Launched"
+class ThreadLaunched(Edge):
+    __name__ = "ThreadLaunched"
 
     timestamp: int  # Array of process launch times
 
