@@ -23,6 +23,9 @@ class GenericTransformer(Transformer):
 
         event_type = event.get(FieldNames.EVENT_TYPE)
 
+        # print(event_type)
+        # print(event)
+
         if event.get(FieldNames.ALERTED_ON):
             return self.make_alert(event)
 
@@ -101,29 +104,32 @@ class GenericTransformer(Transformer):
         """
 
         parent = ThreadProcess(
-            API_CALL=event[FieldNames.API_CALL],
-            CATEGORY=event[FieldNames.CATEGORY],
-            THREAD_ID=int(event[FieldNames.THREAD_ID])
+            api_call=event[FieldNames.API_CALL],
+            category=event[FieldNames.CATEGORY],
+            thread_id=int(event[FieldNames.THREAD_ID])
         )
 
         # Create the file node.
         # TODO: Integrate into the ThreadProcess() init function?
-        parent_thread = parent.get_file_node()
-        parent_thread.file_of[parent]
+        parent_thread = parent.get_api_node()
+        parent_thread.relation[parent]
 
         child = ThreadProcess(
-            API_CALL=event[FieldNames.API_CALL],
-            CATEGORY=event[FieldNames.CATEGORY],
-            THREAD_ID=int(event[FieldNames.THREAD_ID])
+            api_call=event[FieldNames.API_CALL],
+            category=event[FieldNames.CATEGORY],
+            thread_id=int(event[FieldNames.THREAD_ID])
         )
 
-        child_thread = child.get_file_node()
-        child_thread.file_of[child]
+        child_thread = child.get_api_node()
+        child_thread.relation[child]
+
+        print(parent_thread)
+        print(child_thread)
 
         if FieldNames.TIMESTAMP in event:
-            parent.launched[child].append(timestamp=int(event[FieldNames.TIMESTAMP]))
+            parent.threadlaunched[child].append(timestamp=int(event[FieldNames.TIMESTAMP]))
         else:
-            parent.launched[child]
+            parent.threadlaunched[child]
 
         return (parent, parent_thread, child, child_thread)
 

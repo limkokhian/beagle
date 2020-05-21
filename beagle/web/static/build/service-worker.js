@@ -15,7 +15,11 @@ importScripts("/workbox-v3.6.3/workbox-sw.js");
 workbox.setConfig({modulePathPrefix: "/workbox-v3.6.3"});
 
 importScripts(
+<<<<<<< HEAD
   "/precache-manifest.a95933fa36e63b9c6aba0dad3cbb3ce3.js"
+=======
+  "/precache-manifest.de804af3b62b8e1166357be605626360.js"
+>>>>>>> f3e4346e8979532d2b74fb053577974619e352bb
 );
 
 workbox.clientsClaim();
@@ -31,5 +35,9 @@ workbox.precaching.precacheAndRoute(self.__precacheManifest, {});
 
 workbox.routing.registerNavigationRoute("/index.html", {
   
+<<<<<<< HEAD
   blacklist: [/^\/_/,/\/[^/]+\.[^/]+$/],
+=======
+  blacklist: [/^\/_/,/\/[^\/]+\.[^\/]+$/],
+>>>>>>> f3e4346e8979532d2b74fb053577974619e352bb
 });

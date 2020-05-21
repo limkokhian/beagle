@@ -68,6 +68,9 @@ class CuckooReport(DataSource):
         self.report = json.load(open(cuckoo_report, "r"))
         self.behavior = self.report["behavior"]
 
+        #Added new line below by Ali Suwanda 19052020
+        self.processes2 = self.report["behavior"]["processes"]
+
         self.processes: Dict[int, dict] = {}
         self.proc_calls: self.report["processes"]
         self.threads: Dict[int, dict] = {}
@@ -136,7 +139,7 @@ class CuckooReport(DataSource):
 
     def process_tree(self) -> Generator[dict, None, None]:
         def process_single_entry(entry: dict) -> Generator[dict, None, None]:
-
+            print(self.processes)
             current_proc = self.processes[int(entry["pid"])]
             current_proc[FieldNames.COMMAND_LINE] = entry["command_line"]
             self.processes[int(entry["pid"])] = current_proc.copy()
@@ -190,36 +193,41 @@ class CuckooReport(DataSource):
 
         threads = {}
 
-        # for process in self.behavior["processes"]:
-        #     threads[int(process["tid"])] = {
-        #         FieldNames.THREAD_ID: int(process["tid"]),
-        #         #FieldNames.PROCESS_ID: int(process["pid"]),
-        #         #FieldNames.CATEGORY: "unknown",
-        #         #FieldNames.API_CALL: "unknown",
-        #     }
+        #Added by Ali Suwanda 19052020
+        for process2 in self.processes2:
+            for call in process2["calls"]:
+                threads[int(call["tid"])] = {
+                     FieldNames.THREAD_ID: int(call["tid"]),
+                     #FieldNames.CATEGORY: call["category"],
+                     #FieldNames.API_CALL.append("unknown"),
+                }
 
-        for process in self.proc_calls["calls"]:
-            threads[int(process["tid"])] = {
-                FieldNames.THREAD_ID: int(process["tid"]),
-                #FieldNames.PROCESS_ID: int(process["pid"]),
-                #FieldNames.CATEGORY: "unknown",
-                #FieldNames.API_CALL: "unknown",
-            }
+        #Commented by Ali Suwanda 19052020
+        # for process in self.behavior["processes"]:
+        #    for call in self.processes["calls"]:
+        #         threads[int(call["tid"])] = {
+        #             FieldNames.THREAD_ID: int(process["tid"]),
+        #             FieldNames.CATEGORY: "unknown",
+        #             # FieldNames.API_CALL.append("unknown"),
+        #         }
+
+        
         return threads
 
     def process_calls(self) -> Generator[dict, None, None]:
         def process_single_calls(entry: dict) -> Generator[dict, None, None]:
 
-            print(self.threads)
-
-            current_threads = self.threads[int(entry["tid"])] 
+            #print(self.threads)
+            
+            current_thread = self.threads[int(entry["tid"])] 
+            #current_proc = self.threads[int(entry["tid"])] comment by Ali Suwanda 20052020
             #if int(entry["tid"]) in self.threads {
             #         FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
             #         FieldNames.THREAD_ID: entry["tid"],
             #         FieldNames.CATEGORY: entry["category"] if "category" in entry else "",
             #         FieldNames.API_CALL: entry["api"] if "api" in entry else ""
             #}
-            self.threads[int(entry["tid"])] = current_threads.copy()
+            self.threads[int(entry["tid"])] = current_thread.copy()
 
             children = entry.get("calls", [])
 
@@ -236,21 +244,21 @@ class CuckooReport(DataSource):
                 yield {
                     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
                     FieldNames.THREAD_ID: entry["tid"],
-                    current_threads[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
-                    current_threads[FieldNames.API_CALL]: child["api"] if "api" in child else "",
-                    **current_threads,
+                    current_thread[FieldNames.CATEGORY]: child["category"] if "category" in child else "",
+                    current_thread[FieldNames.API_CALL]: child["api"] if "api" in child else "",
+                    **current_thread,
                 }
 
             if len(children) > 0:
 
                 for child in children:
 
-                    current_threads = self.threads[int(entry["tid"])]
-                    current_threads[FieldNames.CATEGORY]= child["category"],
-                    current_threads[FieldNames.API_CALL]= child["api"],
-                    self.threads[int(entry["tid"])] = current_threads.copy()
+                    current_thread = self.threads[int(entry["tid"])]
+                    current_thread[FieldNames.CATEGORY]= child["category"],
+                    current_thread[FieldNames.API_CALL]= child["api"],
+                    self.threads[int(entry["tid"])] = current_thread.copy()
 
-                    current_thread_as_parent = self._convert_thread_to_parent_fields(current_proc.copy())
+                    current_thread_as_parent = self._convert_thread_to_parent_fields(current_thread.copy())
 
                     # print({
                     #     FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
@@ -263,7 +271,7 @@ class CuckooReport(DataSource):
                         FieldNames.EVENT_TYPE: EventTypes.THREAD_LAUNCHED,
                         FieldNames.TIMESTAMP: child["time"] if "time" in child else "unknown",
                         **current_thread_as_parent,
-                        **current_threads,
+                        **current_thread,
                     }
 
                     yield from process_single_calls(child)
@@ -368,13 +376,12 @@ class CuckooReport(DataSource):
     def global_network_events(self) -> Generator[dict, None, None]:
         self.threads: Dict[int, dict] = self.identify_threads()
         yield from self.process_calls()
-        print(self.threads)
 
         root_proc_name = self.report.get("target", {}).get("file", {"name": ""})["name"]
         pid = [procmemory["pid"] for procmemory in self.report["procmemory"]]
         root_proc = None
         if root_proc_name:
-            process_call = list(self.threads.value())
+            process_call = list(self.threads.values())
             process_entries = list(self.processes.values())
 
             # Get the submitted sample to match to the network events.
@@ -384,12 +391,15 @@ class CuckooReport(DataSource):
                     break
             
             for call in process_call:
-                if call["pid"] in pid:
+                #comment by Ali Suwanda 19052020
+                #if call["tid"] in pid:
                     yield {
                         FieldNames.THREAD_ID: call[FieldNames.THREAD_ID],
-                        FieldNames.PROCESS_ID: call[FieldNames.PROCESS_ID],
-                        FieldNames.CATEGORY: call[FieldNames.CATEGORY],
-                        FieldNames.API_CALL: call[FieldNames.API_CALL]
+                        #begin comment by Ali Suwanda 19052020
+                        #FieldNames.PROCESS_ID: call[FieldNames.PROCESS_ID],
+                        #FieldNames.CATEGORY: call[FieldNames.CATEGORY],
+                        #FieldNames.API_CALL: call[FieldNames.API_CALL]
+                        #end comment by Ali Suwanda 19052020
                     }
 
         if not root_proc_name or not root_proc:
