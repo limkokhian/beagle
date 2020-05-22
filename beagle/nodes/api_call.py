@@ -17,7 +17,7 @@ class ApiCall(Node):
     category: Optional[str]
     api_call: Optional[str]
 
-    relation: DefaultDict["APICall", Call]
+    relation: DefaultDict["Call", Call]
 
     key_fields: List[str] = ["thread_id", "api_call"]
     
@@ -27,16 +27,16 @@ class ApiCall(Node):
         category: str = None,
         api_call: str = None
     ) -> None:
-        self.thread_id = thread_id
+        self.thread_id = str(thread_id)
         self.category = category
         self.api_call = api_call
 
         self.relation = defaultdict(Call)
-
+        
     @property
     def edges(self) -> List[DefaultDict]:
         return [self.relation]
 
     @property
     def _display(self) -> str:
-        return self.category or super()._display
+        return self.thread_id or super()._display
